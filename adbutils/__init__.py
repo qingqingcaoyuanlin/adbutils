@@ -392,6 +392,62 @@ class AdbDevice(ShellMixin):
     def push(self, local: str, remote: str):
         self.adb_output("push", local, remote)
 
+    def pull_dir(self, dir):
+        import os
+        import os.path
+        import time
+
+        def TimeFormat():
+            '''时间格式如‘20180423-135447’'''
+            return time.strftime('%Y%m%d-%H%M%S', time.localtime(time.time()))
+
+        all_files = []
+
+        def walk_files(path):
+            '''文件遍历'''
+            txt = self.shell('ls ' + path + ' -l')
+            lines = txt.splitlines()
+            for line in lines:
+                words = line.split(' ')
+                while '' in words:
+                    words.remove('')
+
+                if len(words) == 8:
+                    if words[0].startswith('d'):
+                        if path.endswith('/'):
+                            walk_files(path + words[7] + '/')
+                        else:
+                            path += '/'
+                            walk_files(path + '/' + words[7] + '/')
+                        pass
+                    elif words[0].startswith('-'):
+                        if path.endswith('/'):
+                            all_files.append(path + words[7])
+                        else:
+                            all_files.append(path + '/' + words[7])
+                    else:
+                        print('other file type')
+                        pass
+                else:
+                    pass
+
+        if not dir.endswith('/'):
+            dir += '/'
+
+        walk_files(dir)
+        header = dir.split('/')[-2] + '-' + TimeFormat()  #待优化
+        for f in all_files:
+            #print('file:', f)
+            dest = f.replace(dir, '')
+            file_dir, file_name = os.path.split(dest)
+            #print(file_dir, file_name)
+            if not os.path.exists(os.path.join(header, file_dir)):
+                os.makedirs(os.path.join(header, file_dir))
+            dest = header + '/' + dest
+            #print("dest:", dest)
+            self.sync.pull(f, dest)
+
+
 
 class Sync():
     def __init__(self, adbclient: AdbClient, serial: str):
